@@ -11,9 +11,8 @@ final class FinderCutPaste {
 
     // MARK: - Cut
 
-    // Dispatches AppleScript to a background thread so the main run loop
-    // stays free — required for macOS to show the Automation permission
-    // dialog the first time Handy tries to control Finder.
+    // AppleScript runs off the main thread (serialized by AppleScriptRunner)
+    // so the event-tap callback returns immediately.
     func cut() {
         cutInProgress = true
         DispatchQueue.global(qos: .userInteractive).async { [weak self] in
@@ -51,7 +50,15 @@ final class FinderCutPaste {
         updateMenuBarBadge()
 
         DispatchQueue.global(qos: .userInteractive).async {
-            guard let target = self.finderWindowTarget() else { return }
+            guard let target = self.finderWindowTarget() else {
+                // Destination couldn't be resolved (no Finder window, script
+                // failure). Restore the cut instead of dropping it silently.
+                DispatchQueue.main.async {
+                    self.pendingURLs = urlsToMove
+                    self.updateMenuBarBadge()
+                }
+                return
+            }
             let destDir = URL(fileURLWithPath: target)
             // Skip files already in the destination — prevents accidental
             // "(2)" duplicates when the user pastes into the same folder.
@@ -61,7 +68,7 @@ final class FinderCutPaste {
             guard !sources.isEmpty else { return }
             var errors: [String] = []
             for src in sources {
-                let dst = Self.uniqueDestination(src, in: destDir)
+                let dst = FileNaming.uniqueDestination(src, in: destDir)
                 do {
                     try FileManager.default.moveItem(at: src, to: dst)
                 } catch {
@@ -85,20 +92,6 @@ final class FinderCutPaste {
 
     // MARK: - Private helpers
 
-    private static func uniqueDestination(_ src: URL, in dir: URL) -> URL {
-        var dest = dir.appendingPathComponent(src.lastPathComponent)
-        guard FileManager.default.fileExists(atPath: dest.path) else { return dest }
-        let name = src.deletingPathExtension().lastPathComponent
-        let ext  = src.pathExtension
-        var n = 2
-        repeat {
-            let candidate = ext.isEmpty ? "\(name) (\(n))" : "\(name) (\(n)).\(ext)"
-            dest = dir.appendingPathComponent(candidate)
-            n += 1
-        } while FileManager.default.fileExists(atPath: dest.path)
-        return dest
-    }
-
     private func selectedFinderPaths() -> [String] {
         let src = """
         tell application "Finder"
@@ -110,8 +103,7 @@ final class FinderCutPaste {
             return out
         end tell
         """
-        var err: NSDictionary?
-        guard let desc = NSAppleScript(source: src)?.executeAndReturnError(&err),
+        guard let desc = AppleScriptRunner.shared.run(src).descriptor,
               desc.numberOfItems > 0 else { return [] }
         return (1...desc.numberOfItems).compactMap { desc.atIndex($0)?.stringValue }
     }
@@ -122,10 +114,10 @@ final class FinderCutPaste {
             return POSIX path of (target of front Finder window as alias)
         end tell
         """
-        var err: NSDictionary?
-        return NSAppleScript(source: src)?.executeAndReturnError(&err).stringValue
+        return AppleScriptRunner.shared.run(src).descriptor?.stringValue
     }
 
+    // Reflect cut count in the menu bar icon badge via the AppDelegate
     private func updateMenuBarBadge() {
         DispatchQueue.main.async {
             NotificationCenter.default.post(

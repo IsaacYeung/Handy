@@ -35,4 +35,4 @@ SIGNING_IDENTITY="Developer ID Application: Your Name (TEAMID)" bash build.sh
 
 ## License
 
-_TODO: choose a license (MIT is a common choice for utilities like this)._
+MIT — see [LICENSE](LICENSE).

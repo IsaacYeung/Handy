@@ -370,10 +370,8 @@ struct TweaksTab: View {
     private func checkAutomation() {
         automationOK = nil  // show spinner while checking
         DispatchQueue.global(qos: .userInitiated).async {
-            var err: NSDictionary?
-            let result = NSAppleScript(source: "tell application \"Finder\" to get name")?
-                .executeAndReturnError(&err)
-            let ok = result != nil && err == nil
+            let result = AppleScriptRunner.shared.run("tell application \"Finder\" to get name")
+            let ok = result.descriptor != nil && result.error == nil
             DispatchQueue.main.async { automationOK = ok }
         }
     }
@@ -388,8 +386,10 @@ struct TweaksTab: View {
     }
 
     private func toggleDarkMode() {
-        NSAppleScript(source: "tell app \"System Events\" to tell appearance preferences to set dark mode to not dark mode")?
-            .executeAndReturnError(nil)
+        DispatchQueue.global(qos: .userInitiated).async {
+            AppleScriptRunner.shared.run(
+                "tell app \"System Events\" to tell appearance preferences to set dark mode to not dark mode")
+        }
     }
 }
 
@@ -436,10 +436,11 @@ struct ToolsTab: View {
         alert.addButton(withTitle: "Empty Trash")
         alert.addButton(withTitle: "Cancel")
         guard alert.runModal() == .alertFirstButtonReturn else { return }
-        let t = Process()
-        t.executableURL = URL(fileURLWithPath: "/bin/sh")
-        t.arguments = ["-c", "rm -rf ~/.Trash/*"]
-        try? t.run()
+        // Let Finder do it: handles dotfiles, external-volume trashes, and
+        // shows its own progress UI — unlike a raw `rm -rf ~/.Trash/*`.
+        DispatchQueue.global(qos: .userInitiated).async {
+            AppleScriptRunner.shared.run("tell application \"Finder\" to empty trash")
+        }
     }
 }
 

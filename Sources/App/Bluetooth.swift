@@ -87,4 +87,13 @@ final class BluetoothSleepFeature {
             wasOnBeforeSleep = false
         }
     }
+
+    // Called at app termination: if we turned Bluetooth off for sleep and the
+    // wake handler never ran, turn it back on rather than leaving it off.
+    func restoreOnQuit() {
+        if wasOnBeforeSleep {
+            BluetoothManager.shared.setPower(true)
+            wasOnBeforeSleep = false
+        }
+    }
 }

@@ -12,6 +12,15 @@ VOLUME="/Volumes/$APP_NAME"
 SDK=$(xcrun --sdk macosx --show-sdk-path)
 TARGET="$(uname -m)-apple-macos13.0"
 
+# Single source of truth for the app version — bump the VERSION file per
+# release; build.sh stamps it into both Info.plists.
+VERSION=$(tr -d '[:space:]' < VERSION)
+
+# --check: run type-check + tests only (used by CI, which can't build a DMG
+# headlessly because DMG layout drives Finder via AppleScript).
+CHECK_ONLY=false
+[ "${1:-}" = "--check" ] && CHECK_ONLY=true
+
 # ── Signing configuration ─────────────────────────────────────────────────────
 # SIGNING_IDENTITY controls how the app is signed:
 #   "-"  (default)  → ad-hoc signing. Works for LOCAL testing only. Permissions
@@ -45,6 +54,8 @@ swiftc -typecheck \
     "Sources/App/FinderCutPaste.swift" \
     "Sources/App/KeepAwake.swift" \
     "Sources/App/Bluetooth.swift" \
+    "Sources/App/AppleScriptRunner.swift" \
+    "Sources/Shared/FileNaming.swift" \
     -sdk "$SDK" -target "$TARGET" \
     -framework Cocoa -framework SwiftUI -framework ServiceManagement \
     2>&1 | sed 's/^/  /'
@@ -60,12 +71,14 @@ if [ "${PIPESTATUS[0]}" -ne 0 ]; then echo "Type-check failed. Aborting."; exit 
 # ── Phase 2: Logic unit tests
 echo "Running tests..."
 TEST_BIN="/tmp/handy-tests-$$"
-swiftc "Tests/HandyTests.swift" -o "$TEST_BIN" 2>&1 | sed 's/^/  /'
+swiftc "Sources/Shared/FileNaming.swift" "Tests/main.swift" -o "$TEST_BIN" 2>&1 | sed 's/^/  /'
 if [ "${PIPESTATUS[0]}" -ne 0 ]; then echo "Test compilation failed. Aborting."; exit 1; fi
 "$TEST_BIN"
 TEST_RESULT=$?
 rm -f "$TEST_BIN"
 if [ "$TEST_RESULT" -ne 0 ]; then echo "Tests failed. Aborting."; exit 1; fi
+
+if $CHECK_ONLY; then echo "Check passed (type-check + tests)."; exit 0; fi
 
 # ── Clean ─────────────────────────────────────────────────────────────────────
 rm -rf "$APP_BUNDLE"
@@ -89,6 +102,8 @@ swiftc "Sources/App/main.swift" \
        "Sources/App/FinderCutPaste.swift" \
        "Sources/App/KeepAwake.swift" \
        "Sources/App/Bluetooth.swift" \
+       "Sources/App/AppleScriptRunner.swift" \
+       "Sources/Shared/FileNaming.swift" \
     -sdk "$SDK" \
     -target "$TARGET" \
     -framework Cocoa \
@@ -112,6 +127,15 @@ swiftc "Sources/Extension/FinderSyncExtension.swift" \
     -o "$PLUGINSDIR/$APPEX_BUNDLE/Contents/MacOS/$APPEX_NAME"
 
 cp "Sources/Extension/Info.plist" "$PLUGINSDIR/$APPEX_BUNDLE/Contents/Info.plist"
+
+# ── Stamp version (single source: the VERSION file) ──────────────────────────
+for plist in "$APP_BUNDLE/Contents/Info.plist" \
+             "$PLUGINSDIR/$APPEX_BUNDLE/Contents/Info.plist"; do
+    /usr/libexec/PlistBuddy \
+        -c "Set :CFBundleShortVersionString $VERSION" \
+        -c "Set :CFBundleVersion $VERSION" \
+        "$plist"
+done
 
 # ── Sign (inside-out: extension → [frameworks] → app) ────────────────────────
 # Nested code must be signed before the code that contains it. When Sparkle is

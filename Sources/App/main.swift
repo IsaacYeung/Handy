@@ -71,6 +71,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    func applicationWillTerminate(_ notification: Notification) {
+        // Kill the caffeinate child — otherwise it outlives Handy and the
+        // Mac never sleeps again until the orphan is killed manually.
+        KeepAwake.shared.disable()
+        // If we quit between sleep and wake, put Bluetooth back on.
+        BluetoothSleepFeature.shared.restoreOnQuit()
+        EventTap.shared.stop()
+    }
+
     // MARK: First launch
 
     private func performFirstLaunchSetup() {

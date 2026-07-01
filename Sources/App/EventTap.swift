@@ -88,31 +88,37 @@ final class EventTap {
         let inFinder = frontID == "com.apple.finder"
 
         // ── Finder keyboard features ──────────────────────────────────────────
+        // While the user is renaming a file, Cmd+X/Cmd+V/Return must keep
+        // their normal text-editing meaning — never intercept in rename mode.
+        // (finderIsRenaming() is checked lazily, only when a combo matches,
+        // to avoid an Accessibility round-trip on every keystroke.)
         if inFinder {
             // Cmd+X → cut selected files
-            if cmd && key == KCode.x && pref("kb.cutPaste") {
+            if cmd && key == KCode.x && pref("kb.cutPaste") && !finderIsRenaming() {
                 FinderCutPaste.shared.cut()
                 return true
             }
 
             // Cmd+V → paste (move) cut files if we have any pending
-            if cmd && key == KCode.v && FinderCutPaste.shared.hasPending {
+            if cmd && key == KCode.v && FinderCutPaste.shared.hasPending && !finderIsRenaming() {
                 FinderCutPaste.shared.paste()
                 return true
             }
 
-            // Return → open file (when not in Finder rename/text mode)
+            // Return → open file
             if bare && key == KCode.returnKey && pref("kb.returnToOpen") && !finderIsRenaming() {
                 DispatchQueue.global(qos: .userInteractive).async {
-                    NSAppleScript(source: "tell application \"Finder\" to open selection")?.executeAndReturnError(nil)
+                    AppleScriptRunner.shared.run("tell application \"Finder\" to open selection")
                 }
                 return true
             }
-        }
 
-        // Cmd+C or Escape cancels pending cut (no consume)
-        if (cmd && key == KCode.c) || (bare && key == KCode.escape) {
-            FinderCutPaste.shared.cancel()
+            // Cmd+C or Escape in Finder cancels a pending cut (event passes
+            // through). Scoped to Finder so e.g. Escape in another app's
+            // dialog doesn't silently discard the cut.
+            if (cmd && key == KCode.c) || (bare && key == KCode.escape) {
+                FinderCutPaste.shared.cancel()
+            }
         }
 
         return false
