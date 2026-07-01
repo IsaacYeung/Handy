@@ -168,7 +168,7 @@ struct TweaksTab: View {
             // ── Finder ───────────────────────────────────────────────────────
             Section {
                 kbRow("Cut & Paste Files", icon: "scissors",
-                      detail: "Cmd+X marks files for move; Cmd+V in another folder moves them",
+                      detail: "Cmd+X marks files for move; Cmd+V moves them; Cmd+Z undoes the move",
                       binding: $cutPaste)
                 kbRow("Open Files with Return", icon: "return",
                       detail: "Return opens selected items; Shift+Return to rename",

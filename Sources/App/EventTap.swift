@@ -27,6 +27,7 @@ enum KCode {
     static let c: Int64 = 8
     static let v: Int64 = 9
     static let x: Int64 = 7
+    static let z: Int64 = 6
     static let returnKey: Int64 = 36
     static let escape: Int64 = 53
 }
@@ -102,6 +103,14 @@ final class EventTap {
             // Cmd+V → paste (move) cut files if we have any pending
             if cmd && key == KCode.v && FinderCutPaste.shared.hasPending && !finderIsRenaming() {
                 FinderCutPaste.shared.paste()
+                return true
+            }
+
+            // Cmd+Z → undo the last Handy move. Single-shot: once consumed,
+            // canUndo is false and Cmd+Z reaches Finder's own undo again.
+            // (`cmd` requires Command alone, so Cmd+Shift+Z redo passes through.)
+            if cmd && key == KCode.z && FinderCutPaste.shared.canUndo && !finderIsRenaming() {
+                FinderCutPaste.shared.undo()
                 return true
             }
 

@@ -88,11 +88,13 @@ suite("KCode values (virtual key codes must match hardware layout)")
 let x:       Int64 = 7
 let v:       Int64 = 9
 let c:       Int64 = 8
+let z:       Int64 = 6
 let ret:     Int64 = 36
 let escape:  Int64 = 53
 check(x == 7,  "Cmd+X virtual key code is 7")
 check(v == 9,  "Cmd+V virtual key code is 9")
 check(c == 8,  "Cmd+C virtual key code is 8")
+check(z == 6,  "Cmd+Z virtual key code is 6")
 check(ret == 36, "Return key virtual key code is 36")
 check(escape == 53, "Escape key virtual key code is 53")
 
