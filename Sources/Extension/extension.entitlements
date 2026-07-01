@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!--
+      Non-sandboxed FinderSync extension (Developer ID distribution, not App
+      Store). Because it is not sandboxed, it can run helper processes (ditto,
+      open) and read/write the files the user acts on without the old
+      "temporary-exception" file-access hack, which App Store review forbids
+      and which was only ever needed to escape the sandbox.
+    -->
+</dict>
+</plist>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!--
+      Handy is distributed via Developer ID (not the App Store), so it is NOT
+      sandboxed. Under the Hardened Runtime (required for notarization) it needs
+      explicit permission to send Apple Events, which is how the Cut/Paste and
+      Return-to-open Finder features drive Finder.
+    -->
+    <key>com.apple.security.automation.apple-events</key>
+    <true/>
+</dict>
+</plist>
