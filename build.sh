@@ -21,6 +21,17 @@ VERSION=$(tr -d '[:space:]' < VERSION)
 CHECK_ONLY=false
 [ "${1:-}" = "--check" ] && CHECK_ONLY=true
 
+# ── Sparkle (auto-update framework) ───────────────────────────────────────────
+# Vendored outside git; fetched on first build (and in CI).
+SPARKLE_VER="2.9.3"
+SPARKLE_DIR="vendor/Sparkle"
+if [ ! -d "$SPARKLE_DIR/Sparkle.framework" ]; then
+    echo "Fetching Sparkle $SPARKLE_VER..."
+    mkdir -p "$SPARKLE_DIR"
+    curl -sL "https://github.com/sparkle-project/Sparkle/releases/download/$SPARKLE_VER/Sparkle-$SPARKLE_VER.tar.xz" \
+        | tar -xJ -C "$SPARKLE_DIR"
+fi
+
 # ── Signing configuration ─────────────────────────────────────────────────────
 # SIGNING_IDENTITY controls how the app is signed:
 #   "-"  (default)  → ad-hoc signing. Works for LOCAL testing only. Permissions
@@ -57,6 +68,7 @@ swiftc -typecheck \
     "Sources/App/AppleScriptRunner.swift" \
     "Sources/Shared/FileNaming.swift" \
     -sdk "$SDK" -target "$TARGET" \
+    -F "$SPARKLE_DIR" \
     -framework Cocoa -framework SwiftUI -framework ServiceManagement \
     2>&1 | sed 's/^/  /'
 if [ "${PIPESTATUS[0]}" -ne 0 ]; then echo "Type-check failed. Aborting."; exit 1; fi
@@ -106,12 +118,19 @@ swiftc "Sources/App/main.swift" \
        "Sources/Shared/FileNaming.swift" \
     -sdk "$SDK" \
     -target "$TARGET" \
+    -F "$SPARKLE_DIR" \
     -framework Cocoa \
     -framework SwiftUI \
     -framework ServiceManagement \
+    -framework Sparkle \
+    -Xlinker -rpath -Xlinker @executable_path/../Frameworks \
     -o "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
 
 cp "Sources/App/Info.plist" "$APP_BUNDLE/Contents/Info.plist"
+
+# ── Embed Sparkle ─────────────────────────────────────────────────────────────
+mkdir -p "$APP_BUNDLE/Contents/Frameworks"
+cp -R "$SPARKLE_DIR/Sparkle.framework" "$APP_BUNDLE/Contents/Frameworks/"
 
 # ── Compile FinderSync extension ──────────────────────────────────────────────
 echo "Compiling FinderSync extension..."
@@ -137,10 +156,19 @@ for plist in "$APP_BUNDLE/Contents/Info.plist" \
         "$plist"
 done
 
-# ── Sign (inside-out: extension → [frameworks] → app) ────────────────────────
-# Nested code must be signed before the code that contains it. When Sparkle is
-# added, its framework gets signed here, between the extension and the app.
+# ── Sign (inside-out: Sparkle internals → framework → extension → app) ───────
+# Nested code must be signed before the code that contains it.
 echo "Signing ($SIGN_MODE)..."
+SPARKLE_FW="$APP_BUNDLE/Contents/Frameworks/Sparkle.framework"
+# Sparkle's nested helpers first (required for hardened-runtime/Dev ID builds)
+for nested in \
+    "$SPARKLE_FW/Versions/B/XPCServices/Downloader.xpc" \
+    "$SPARKLE_FW/Versions/B/XPCServices/Installer.xpc" \
+    "$SPARKLE_FW/Versions/B/Autoupdate" \
+    "$SPARKLE_FW/Versions/B/Updater.app"; do
+    [ -e "$nested" ] && codesign --force $RELEASE_FLAGS --sign "$SIGNING_IDENTITY" "$nested"
+done
+codesign --force $RELEASE_FLAGS --sign "$SIGNING_IDENTITY" "$SPARKLE_FW"
 codesign --force $RELEASE_FLAGS --sign "$SIGNING_IDENTITY" \
     --entitlements "Sources/Extension/extension.entitlements" \
     "$PLUGINSDIR/$APPEX_BUNDLE"
@@ -156,6 +184,7 @@ checks=(
     "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
     "$APP_BUNDLE/Contents/Info.plist"
     "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
+    "$APP_BUNDLE/Contents/Frameworks/Sparkle.framework/Versions/B/Sparkle"
     "$PLUGINSDIR/$APPEX_BUNDLE/Contents/MacOS/$APPEX_NAME"
     "$PLUGINSDIR/$APPEX_BUNDLE/Contents/Info.plist"
 )

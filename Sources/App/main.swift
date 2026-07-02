@@ -1,6 +1,7 @@
 import Cocoa
 import SwiftUI
 import ServiceManagement
+import Sparkle
 
 // MARK: - Settings window
 
@@ -38,6 +39,11 @@ class SettingsWindowController: NSWindowController, NSWindowDelegate {
 class AppDelegate: NSObject, NSApplicationDelegate {
     var statusBarItem: NSStatusItem?
     private var cutBadgeItem: NSMenuItem?
+
+    // Sparkle auto-updater. Checks the appcast on GitHub Releases on a
+    // schedule and via the "Check for Updates…" menu item.
+    let updaterController = SPUStandardUpdaterController(
+        startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -142,6 +148,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         menu.addItem(NSMenuItem(title: "Settings\u{2026}",
                                 action: #selector(openSettings), keyEquivalent: ","))
+
+        // Target the updater controller directly — it also handles
+        // enabling/disabling the item while a check is in progress.
+        let updateItem = NSMenuItem(
+            title: "Check for Updates\u{2026}",
+            action: #selector(SPUStandardUpdaterController.checkForUpdates(_:)),
+            keyEquivalent: "")
+        updateItem.target = updaterController
+        menu.addItem(updateItem)
+
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Quit Handy",
                                 action: #selector(quit), keyEquivalent: "q"))

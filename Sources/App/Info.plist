@@ -24,5 +24,11 @@
 	<string>13.0</string>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>Handy controls Finder to cut, paste, and open the files you select.</string>
+	<key>SUFeedURL</key>
+	<string>https://github.com/IsaacYeung/Handy/releases/latest/download/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>Gw6EFPJ1bDw3DdxJhBCJE2jP8kSZku9gBx/Xc3Qmb9c=</string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
 </dict>
 </plist>

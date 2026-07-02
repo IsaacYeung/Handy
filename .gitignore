@@ -15,6 +15,10 @@
 *.certSigningRequest
 ExportOptions.plist
 
-# Sparkle signing keys (added later) — private key must stay local
+# Sparkle signing keys — private key lives in the Keychain, never in git
 sparkle_private_key*
 dsa_priv.pem
+
+# Vendored frameworks (fetched by build.sh) and release staging
+vendor/
+releases/
